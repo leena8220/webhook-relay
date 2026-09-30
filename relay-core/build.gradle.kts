@@ -4,7 +4,7 @@ plugins {
 }
 
 dependencies {
-    api(platform("org.springframework.boot:spring-boot-dependencies:4.1.0"))
+    api(platform("org.springframework.boot:spring-boot-dependencies:4.1.1"))
 
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.core:jackson-databind")
