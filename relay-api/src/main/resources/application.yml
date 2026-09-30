@@ -1,0 +1,58 @@
+spring:
+  application:
+    name: webhook-relay-api
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/webhook_relay}
+    username: ${DATABASE_USERNAME:webhook_relay}
+    password: ${DATABASE_PASSWORD:webhook_relay}
+    hikari:
+      maximum-pool-size: ${DATABASE_POOL_SIZE:10}
+  flyway:
+    clean-disabled: true
+    validate-migration-naming: true
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  mvc:
+    problemdetails:
+      enabled: true
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+  forward-headers-strategy: framework
+
+relay:
+  master-key-base64: ${RELAY_MASTER_KEY_BASE64}
+  security:
+    allow-http: ${RELAY_SECURITY_ALLOW_HTTP:false}
+    allow-private-networks: ${RELAY_SECURITY_ALLOW_PRIVATE_NETWORKS:false}
+  api:
+    max-payload-bytes: ${RELAY_MAX_PAYLOAD_BYTES:1048576}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+springdoc:
+  api-docs:
+    path: /openapi
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  structured:
+    format:
+      console: logstash

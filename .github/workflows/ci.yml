@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Verify formatting, tests, and static checks
+        run: ./gradlew --no-daemon check
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Build non-root application images
+        run: |
+          docker build --build-arg APP_MODULE=relay-api --tag webhook-relay-api:test .
+          docker build --build-arg APP_MODULE=relay-worker --tag webhook-relay-worker:test .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: "**/build/reports/"
+          if-no-files-found: ignore
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

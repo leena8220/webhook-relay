@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      kotlin-and-spring:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "org.springframework*"
+      test-dependencies:
+        dependency-type: development
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /examples/receiver
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
