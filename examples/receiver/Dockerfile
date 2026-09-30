@@ -1,4 +1,4 @@
-FROM python:3.13-alpine
+FROM python:3.14-alpine
 
 RUN addgroup -S receiver && adduser -S -D -H -u 10001 -G receiver receiver
 WORKDIR /app
