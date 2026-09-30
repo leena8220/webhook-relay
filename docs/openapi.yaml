@@ -1,0 +1,234 @@
+openapi: 3.1.0
+info:
+  title: Webhook Relay API
+  version: v1
+  description: Register endpoints, enqueue idempotent events, inspect deliveries, and replay dead letters.
+servers:
+  - url: http://localhost:8080
+paths:
+  /v1/endpoints:
+    post:
+      operationId: registerEndpoint
+      summary: Register a webhook endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterEndpointRequest"
+      responses:
+        "201":
+          description: Registered; the signing secret is returned once
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisteredEndpoint"
+    get:
+      operationId: listEndpoints
+      summary: List webhook endpoints
+      responses:
+        "200":
+          description: Endpoint list
+  /v1/endpoints/{endpointId}:
+    get:
+      operationId: getEndpoint
+      summary: Inspect an endpoint
+      parameters:
+        - $ref: "#/components/parameters/EndpointId"
+      responses:
+        "200":
+          description: Endpoint details
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/endpoints/{endpointId}/events:
+    post:
+      operationId: acceptEvent
+      summary: Accept an idempotent event
+      parameters:
+        - $ref: "#/components/parameters/EndpointId"
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+        - name: X-Correlation-ID
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "202":
+          description: New event accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedEvent"
+        "200":
+          description: Existing result for a duplicate idempotency key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedEvent"
+  /v1/deliveries:
+    get:
+      operationId: listDeliveries
+      summary: List recent deliveries
+      parameters:
+        - name: endpointId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/DeliveryStatus"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        "200":
+          description: Delivery list
+  /v1/deliveries/{deliveryId}:
+    get:
+      operationId: getDelivery
+      summary: Inspect a delivery
+      parameters:
+        - $ref: "#/components/parameters/DeliveryId"
+      responses:
+        "200":
+          description: Delivery details
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/deliveries/{deliveryId}/replay:
+    post:
+      operationId: replayDelivery
+      summary: Replay a dead-lettered delivery
+      parameters:
+        - $ref: "#/components/parameters/DeliveryId"
+      responses:
+        "202":
+          description: Delivery requeued
+        "409":
+          $ref: "#/components/responses/Problem"
+  /v1/dead-letters:
+    get:
+      operationId: listDeadLetters
+      summary: List unresolved dead letters
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        "200":
+          description: Dead-letter list
+  /v1/dead-letters/{deadLetterId}:
+    get:
+      operationId: getDeadLetter
+      summary: Inspect an unresolved dead letter
+      parameters:
+        - $ref: "#/components/parameters/DeadLetterId"
+      responses:
+        "200":
+          description: Dead-letter details
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/dead-letters/{deadLetterId}/replay:
+    post:
+      operationId: replayDeadLetter
+      summary: Replay a dead letter
+      parameters:
+        - $ref: "#/components/parameters/DeadLetterId"
+      responses:
+        "202":
+          description: Dead-lettered delivery requeued
+        "404":
+          $ref: "#/components/responses/Problem"
+components:
+  parameters:
+    EndpointId:
+      name: endpointId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DeliveryId:
+      name: deliveryId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DeadLetterId:
+      name: deadLetterId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Problem:
+      description: RFC 9457 problem details
+      content:
+        application/problem+json:
+          schema:
+            type: object
+  schemas:
+    RegisterEndpointRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+        description:
+          type: string
+          maxLength: 500
+        signingSecret:
+          type: string
+          minLength: 32
+          maxLength: 256
+          writeOnly: true
+    RegisteredEndpoint:
+      type: object
+      required: [endpoint, signingSecret]
+      properties:
+        endpoint:
+          type: object
+        signingSecret:
+          type: string
+    AcceptedEvent:
+      type: object
+      required: [eventId, deliveryId, correlationId, duplicate, status]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        deliveryId:
+          type: string
+          format: uuid
+        correlationId:
+          type: string
+        duplicate:
+          type: boolean
+        status:
+          $ref: "#/components/schemas/DeliveryStatus"
+    DeliveryStatus:
+      type: string
+      enum: [PENDING, PROCESSING, RETRYING, DELIVERED, DEAD_LETTERED]

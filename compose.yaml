@@ -1,0 +1,123 @@
+name: webhook-relay
+
+x-relay-environment: &relay-environment
+  DATABASE_URL: jdbc:postgresql://postgres:5432/webhook_relay
+  DATABASE_USERNAME: webhook_relay
+  DATABASE_PASSWORD: local-development-only
+  RELAY_MASTER_KEY_BASE64: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+  RELAY_SECURITY_ALLOW_HTTP: "true"
+  RELAY_SECURITY_ALLOW_PRIVATE_NETWORKS: "true"
+
+services:
+  postgres:
+    image: postgres:18.4-alpine3.24
+    environment:
+      POSTGRES_DB: webhook_relay
+      POSTGRES_USER: webhook_relay
+      POSTGRES_PASSWORD: local-development-only
+    ports:
+      - "${POSTGRES_PORT:-15432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U webhook_relay -d webhook_relay"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v26.1.14
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --memory=512M
+      - --reserve-memory=0M
+      - --overprovisioned
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=internal://0.0.0.0:29092,external://0.0.0.0:9092
+      - --advertise-kafka-addr=internal://redpanda:29092,external://localhost:${REDPANDA_PORT:-19092}
+    ports:
+      - "${REDPANDA_PORT:-19092}:9092"
+    healthcheck:
+      test:
+        - CMD
+        - rpk
+        - cluster
+        - health
+        - -X
+        - brokers=localhost:29092
+        - --exit-when-healthy
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      args:
+        APP_MODULE: relay-api
+    environment:
+      <<: *relay-environment
+      PORT: "8080"
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health/readiness | grep -q '\"status\":\"UP\"'"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    init: true
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      args:
+        APP_MODULE: relay-worker
+    environment:
+      <<: *relay-environment
+      PORT: "8081"
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:29092
+    ports:
+      - "${WORKER_PORT:-8081}:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health/readiness | grep -q '\"status\":\"UP\"'"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    init: true
+    restart: unless-stopped
+
+  receiver:
+    build:
+      context: examples/receiver
+    environment:
+      RECEIVER_SIGNING_SECRET: local-demo-signing-secret-32-characters-minimum
+    ports:
+      - "${RECEIVER_PORT:-8090}:8080"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    init: true
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

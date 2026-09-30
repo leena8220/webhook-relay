@@ -1,0 +1,85 @@
+spring:
+  application:
+    name: webhook-relay-worker
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/webhook_relay}
+    username: ${DATABASE_USERNAME:webhook_relay}
+    password: ${DATABASE_PASSWORD:webhook_relay}
+    hikari:
+      maximum-pool-size: ${DATABASE_POOL_SIZE:10}
+  flyway:
+    clean-disabled: true
+    validate-migration-naming: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:19092}
+    admin:
+      fail-fast: true
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:webhook-relay-workers}
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+    listener:
+      ack-mode: manual_immediate
+      concurrency: ${KAFKA_CONCURRENCY:3}
+      missing-topics-fatal: false
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  task:
+    scheduling:
+      pool:
+        size: 2
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: ${PORT:8081}
+  shutdown: graceful
+
+relay:
+  master-key-base64: ${RELAY_MASTER_KEY_BASE64}
+  outbox:
+    topic: ${RELAY_KAFKA_TOPIC:webhook-deliveries}
+    publish-interval: ${RELAY_OUTBOX_PUBLISH_INTERVAL:250ms}
+    send-timeout: ${RELAY_OUTBOX_SEND_TIMEOUT:10s}
+    batch-size: ${RELAY_OUTBOX_BATCH_SIZE:100}
+  delivery:
+    max-attempts: ${RELAY_MAX_ATTEMPTS:8}
+    base-delay: ${RELAY_BASE_DELAY:1s}
+    max-delay: ${RELAY_MAX_DELAY:5m}
+    lease-duration: ${RELAY_LEASE_DURATION:2m}
+    connect-timeout: ${RELAY_CONNECT_TIMEOUT:3s}
+    request-timeout: ${RELAY_REQUEST_TIMEOUT:10s}
+    retry-scan-interval: ${RELAY_RETRY_SCAN_INTERVAL:500ms}
+    retry-batch-size: ${RELAY_RETRY_BATCH_SIZE:100}
+  security:
+    allow-http: ${RELAY_SECURITY_ALLOW_HTTP:false}
+    allow-private-networks: ${RELAY_SECURITY_ALLOW_PRIVATE_NETWORKS:false}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  structured:
+    format:
+      console: logstash
