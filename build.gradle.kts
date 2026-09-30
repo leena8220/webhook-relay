@@ -12,7 +12,7 @@ plugins {
     kotlin("plugin.spring") version "2.4.10" apply false
     id("org.springframework.boot") version "4.1.0" apply false
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0" apply false
-    id("io.github.ben-manes.versions") version "0.59.0"
+    id("io.github.ben-manes.versions") version "0.64.0"
 }
 
 group = "dev.gdguesser.webhookrelay"
