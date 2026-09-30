@@ -17,7 +17,7 @@ COPY relay-worker/src relay-worker/src
 RUN ./gradlew --no-daemon ":${APP_MODULE}:bootJar" \
     && cp "${APP_MODULE}/build/libs/"*.jar /workspace/application.jar
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 RUN addgroup -S relay && adduser -S -D -H -u 10001 -G relay relay
 WORKDIR /app
