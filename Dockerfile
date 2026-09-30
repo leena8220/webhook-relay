@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM gradle:9.6.1-jdk21-alpine AS build
+FROM gradle:9.8.0-jdk21-alpine AS build
 
 ARG APP_MODULE
 WORKDIR /workspace
