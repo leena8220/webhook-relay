@@ -8,7 +8,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompilationTask
 
 plugins {
     base
-    kotlin("jvm") version "2.4.10" apply false
+    kotlin("jvm") version "2.4.21" apply false
     kotlin("plugin.spring") version "2.4.10" apply false
     id("org.springframework.boot") version "4.1.0" apply false
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0" apply false
